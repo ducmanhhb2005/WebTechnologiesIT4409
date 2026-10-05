@@ -31,7 +31,8 @@ a {
 }
 
 .page {
-	overflow-x: hidden;
+	/* Sửa: clip không tạo scroll container, để sticky bám theo viewport. */
+	overflow-x: clip;
 }
 
 /* ===== Header / thanh điều hướng ===== */
@@ -144,7 +145,8 @@ a {
 	flex: 0 0 calc((100% - 48px) / 3);
 	min-height: 320px;
 	position: relative;
-	box-sizing: content-box;
+	/* Sửa: padding và border nằm trong kích thước đã tính cho mỗi card. */
+	box-sizing: border-box;
 	background: #fff;
 	border: 1px solid #e0d8c8;
 	border-radius: 8px;
@@ -156,6 +158,8 @@ a {
 	position: absolute;
 	top: 12px;
 	right: 12px;
+	/* Sửa: giữ badge nằm phía trên ảnh có z-index: 2. */
+	z-index: 3;
 	background: #c0392b;
 	color: #fff;
 	font-size: 14px;
