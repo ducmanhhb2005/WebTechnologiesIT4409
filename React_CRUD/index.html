@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quản lý người dùng</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const USERS_URL = "https://jsonplaceholder.typicode.com/users";
+    const emptyUser = {
+      name: "",
+      username: "",
+      email: "",
+      address: { street: "", suite: "", city: "" },
+      phone: "",
+      website: "",
+    };
+
+    const fields = [
+      { name: "name", label: "Họ tên", required: true },
+      { name: "username", label: "Username", required: true },
+      { name: "email", label: "Email", type: "email" },
+      { name: "phone", label: "Số điện thoại", type: "tel" },
+      { name: "street", label: "Đường", address: true },
+      { name: "suite", label: "Số căn hộ", address: true },
+      { name: "city", label: "Thành phố", address: true },
+      { name: "website", label: "Website" },
+    ];
+
+    function updateUserField(user, field, value) {
+      if (field.address) {
+        return { ...user, address: { ...user.address, [field.name]: value } };
+      }
+      return { ...user, [field.name]: value };
+    }
+
+    function UserForm({ title, submitLabel, user, onChange, onSave, onCancel }) {
+      const dialogRef = React.useRef(null);
+      const formId = React.useId();
+      const [validationError, setValidationError] = React.useState("");
+
+      React.useEffect(() => {
+        const dialog = dialogRef.current;
+        dialog.showModal();
+        return () => dialog.close();
+      }, []);
+
+      function cancelForm() {
+        dialogRef.current.close();
+        onCancel();
+      }
+
+      function submitForm(event) {
+        event.preventDefault();
+        const name = user.name.trim();
+        const username = user.username.trim();
+
+        if (!name || !username) {
+          setValidationError("Vui lòng nhập họ tên và username.");
+          return;
+        }
+
+        dialogRef.current.close();
+        onSave({ ...user, name, username });
+      }
+
+      return (
+        <dialog
+          className="modal-content"
+          ref={dialogRef}
+          aria-labelledby={`${formId}-title`}
+          onCancel={(event) => {
+            event.preventDefault();
+            cancelForm();
+          }}
+        >
+          <h2 id={`${formId}-title`}>{title}</h2>
+          <form onSubmit={submitForm}>
+            <div className="form-fields">
+              {fields.map((field) => {
+                const inputId = `${formId}-${field.name}`;
+                return (
+                  <div className="form-field" key={field.name}>
+                    <label htmlFor={inputId}>{field.label}</label>
+                    <input
+                      id={inputId}
+                      name={field.name}
+                      type={field.type || "text"}
+                      required={field.required}
+                      value={field.address ? user.address[field.name] : user[field.name]}
+                      onChange={(event) => onChange(field, event.target.value)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            {validationError && <p className="error-message" role="alert">{validationError}</p>}
+            <div className="form-actions">
+              <button type="button" onClick={cancelForm}>Hủy</button>
+              <button type="submit" className="btn-primary">{submitLabel}</button>
+            </div>
+          </form>
+        </dialog>
+      );
+    }
+
+    function SearchForm({ keyword, onChangeValue }) {
+      return (
+        <input
+          className="search-input"
+          type="search"
+          aria-label="Tìm theo họ tên hoặc username"
+          placeholder="Tìm theo name, username"
+          value={keyword}
+          onChange={(event) => onChangeValue(event.target.value)}
+        />
+      );
+    }
+
+    function AddUser({ onAdd, disabled }) {
+      const [adding, setAdding] = React.useState(false);
+      const [user, setUser] = React.useState(emptyUser);
+
+      function closeForm() {
+        setUser(emptyUser);
+        setAdding(false);
+      }
+
+      function handleAdd(userToAdd) {
+        onAdd(userToAdd);
+        closeForm();
+      }
+
+      return (
+        <>
+          <button type="button" className="btn-primary" disabled={disabled} onClick={() => setAdding(true)}>
+            Thêm
+          </button>
+          {adding && (
+            <UserForm
+              title="Thêm người dùng"
+              submitLabel="Thêm"
+              user={user}
+              onChange={(field, value) => setUser((current) => updateUserField(current, field, value))}
+              onSave={handleAdd}
+              onCancel={closeForm}
+            />
+          )}
+        </>
+      );
+    }
+
+    function ResultTable({ keyword, user, onAdded, loading, onLoadComplete }) {
+      const [users, setUsers] = React.useState([]);
+      const [editing, setEditing] = React.useState(null);
+      const [loadError, setLoadError] = React.useState(false);
+      const nextId = React.useRef(1);
+
+      React.useEffect(() => {
+        const controller = new AbortController();
+        const { signal } = controller;
+
+        async function loadUsers() {
+          try {
+            const response = await fetch(USERS_URL, { signal });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const data = await response.json();
+            nextId.current = data.reduce((maxId, item) => Math.max(maxId, item.id), 0) + 1;
+            setUsers(data);
+          } catch (error) {
+            if (!signal.aborted) setLoadError(true);
+          } finally {
+            if (!signal.aborted) onLoadComplete();
+          }
+        }
+
+        loadUsers();
+        return () => controller.abort();
+      }, [onLoadComplete]);
+
+      React.useEffect(() => {
+        if (user) {
+          const addedUser = { ...user, id: nextId.current };
+          nextId.current += 1;
+          setUsers((current) => [...current, addedUser]);
+          onAdded();
+        }
+      }, [user, onAdded]);
+
+      function editUser(userToEdit) {
+        setEditing({ ...userToEdit, address: { ...userToEdit.address } });
+      }
+
+      function saveUser(editedUser) {
+        setUsers((current) => current.map((item) => item.id === editedUser.id ? editedUser : item));
+        setEditing(null);
+      }
+
+      function removeUser(id) {
+        setUsers((current) => current.filter((item) => item.id !== id));
+      }
+
+      const query = keyword.trim().toLowerCase();
+      const filteredUsers = users.filter((item) =>
+        item.name.toLowerCase().includes(query) || item.username.toLowerCase().includes(query)
+      );
+
+      return (
+        <>
+          {loadError && <p className="error-message" role="alert">Không tải được danh sách từ API.</p>}
+          <div className="table-scroll">
+            <table aria-label="Danh sách người dùng">
+              <thead>
+                <tr>
+                  <th scope="col">ID</th>
+                  <th scope="col">Họ tên</th>
+                  <th scope="col">Username</th>
+                  <th scope="col">Email</th>
+                  <th scope="col">Địa chỉ</th>
+                  <th scope="col">Số điện thoại</th>
+                  <th scope="col">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.id}</td>
+                    <td>{item.name}</td>
+                    <td>{item.username}</td>
+                    <td>{item.email}</td>
+                    <td>{[item.address.street, item.address.suite, item.address.city].filter(Boolean).join(", ")}</td>
+                    <td>{item.phone}</td>
+                    <td>
+                      <div className="row-actions">
+                        <button type="button" onClick={() => editUser(item)}>Sửa</button>
+                        <button type="button" className="btn-delete" onClick={() => removeUser(item.id)}>Xóa</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredUsers.length === 0 && (
+                  <tr>
+                    <td colSpan="7" className="table-message" role="status">
+                      {loading ? "Đang tải danh sách…" : "Không tìm thấy người dùng."}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          {editing && (
+            <UserForm
+              title="Sửa người dùng"
+              submitLabel="Lưu"
+              user={editing}
+              onChange={(field, value) => setEditing((current) => updateUserField(current, field, value))}
+              onSave={saveUser}
+              onCancel={() => setEditing(null)}
+            />
+          )}
+        </>
+      );
+    }
+
+    function App() {
+      const [kw, setKeyword] = React.useState("");
+      const [newUser, setNewUser] = React.useState(null);
+      const [loading, setLoading] = React.useState(true);
+      const clearNewUser = React.useCallback(() => setNewUser(null), []);
+      const finishLoading = React.useCallback(() => setLoading(false), []);
+
+      return (
+        <main className="page">
+          <h1>Quản lý người dùng</h1>
+          <div className="toolbar">
+            <SearchForm keyword={kw} onChangeValue={setKeyword} />
+            <AddUser onAdd={setNewUser} disabled={loading} />
+          </div>
+          <ResultTable
+            keyword={kw}
+            user={newUser}
+            onAdded={clearNewUser}
+            loading={loading}
+            onLoadComplete={finishLoading}
+          />
+        </main>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
