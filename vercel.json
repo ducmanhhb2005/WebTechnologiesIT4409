@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/crud_react", "destination": "/React_CRUD/index.html" },
+    { "source": "/crud_react/", "destination": "/React_CRUD/index.html" },
+    { "source": "/react-crud.css", "destination": "/React_CRUD/react-crud.css" },
+    { "source": "/crud_react/react-crud.css", "destination": "/React_CRUD/react-crud.css" }
+  ]
+}
